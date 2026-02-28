@@ -1,4 +1,4 @@
-## 🚀 Overview
+## 🧠 CollabAI: Collaborative Intelligence Learning Platform
 
 The Collective Intelligence Learning Platform is an AI-powered collaborative learning environment where learners solve problems together with peers and AI agents.
 
