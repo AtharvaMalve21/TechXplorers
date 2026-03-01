@@ -1,27 +1,11 @@
-const OpenAI = require("openai");
 const Message = require("../models/message.model");
 const Room = require("../models/room.model");
 const { detectDominance } = require("./dominanceService");
-const dotenv = require("dotenv");
-
-dotenv.config();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const STAGES = [
-  "hypothesis",
-  "discussion",
-  "challenge",
-  "consensus",
-  "reflection",
-];
+const { generateText } = require("./llmService");
 
 exports.runAIModeration = async (roomId, io) => {
   try {
     const room = await Room.findById(roomId).populate("participants", "name");
-
     if (!room || room.status !== "active") return;
 
     const recentMessages = await Message.find({ room: roomId })
@@ -78,40 +62,25 @@ ${formattedDiscussion}
 
 ${dominanceInstruction}
 
-If reasoning is shallow → ask deeper questions.
-If logic gaps exist → highlight them.
 Respond as a facilitator.
 `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a Socratic AI facilitator. Never provide final answers.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      temperature: 0.7,
-    });
+    let aiMessage = await generateText(prompt, 0.7);
 
-    let aiMessage = response.choices[0].message.content;
-
+    // Guardrail
     const forbiddenPatterns = [
       "the answer is",
       "therefore the answer",
       "final answer",
     ];
 
-    const lowerCaseResponse = aiMessage.toLowerCase();
-
-    if (forbiddenPatterns.some((pattern) => lowerCaseResponse.includes(pattern))) {
+    if (
+      forbiddenPatterns.some((pattern) =>
+        aiMessage.toLowerCase().includes(pattern)
+      )
+    ) {
       aiMessage =
-        "Let's revisit the reasoning together. Can someone explain the assumptions being made here?";
+        "Let's revisit the reasoning together. Can someone clarify the assumptions being made here?";
     }
 
     const savedMessage = await Message.create({

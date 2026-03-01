@@ -3,53 +3,26 @@ const Room = require("../models/room.model");
 const { scoreMessage } = require("../services/reasoningScoringService");
 const { updateRoomAnalytics } = require("../services/analyticsService");
 const { runAIModeration } = require("../services/aiModerationService");
+const { getIO } = require("../socket");
 
 exports.sendMessage = async (req, res) => {
     try {
         const { roomId } = req.params;
         const { content } = req.body;
 
-        if (!content) {
-            return res.status(400).json({ message: "Message content required" });
-        }
-
-        const room = await Room.findById(roomId);
-        console.log(room);
-
-        if (!room) {
-            return res.status(404).json({ message: "Room not found" });
-        }
-
-        if (room.status !== "active") {
-            return res.status(400).json({ message: "Room is not active" });
-        }
-
-        const isParticipant = room.participants.some(
-            (id) => id.toString() === req.user._id.toString()
-        );
-
-        if (!isParticipant) {
-            return res.status(403).json({ message: "Not a participant" });
-        }
-
-        if (content.length < 2) {
-            return res.status(400).json({ message: "Message too short" });
-        }
-
         const message = await Message.create({
             room: roomId,
             sender: req.user._id,
             content,
-            stage: room.currentStage,
+            stage: req.body.stage || "discussion",
+            messageType: "user",
         });
 
-        
-        scoreMessage(message._id, req.io);
-        updateRoomAnalytics(roomId);
+        const io = getIO();
 
-        
-        const populatedMessage = await message.populate("sender", "name email");
-        req.io.to(roomId).emit("newMessage", populatedMessage);
+        // 🔥 Run same intelligent logic as socket
+        scoreMessage(message._id, io);
+        updateRoomAnalytics(roomId);
 
         const messageCount = await Message.countDocuments({
             room: roomId,
@@ -57,10 +30,11 @@ exports.sendMessage = async (req, res) => {
         });
 
         if (messageCount % 3 === 0) {
-            runAIModeration(roomId, req.io);
+            await runAIModeration(roomId, io);
         }
 
-        res.status(201).json(populatedMessage);
+        res.status(201).json(message);
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error" });

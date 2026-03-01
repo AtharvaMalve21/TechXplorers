@@ -1,5 +1,6 @@
 const Room = require("../models/room.model");
 const { generateReflectionSummary } = require("../services/reflectionService");
+const { getIO } = require("../socket");
 
 exports.createRoom = async (req, res) => {
     try {
@@ -147,10 +148,11 @@ exports.changeStage = async (req, res) => {
         await room.save();
 
         if (nextStage === "reflection") {
-            generateReflectionSummary(room._id, req.io);
+            generateReflectionSummary(room._id, getIO());
         }
 
-        req.io.to(roomId).emit("stageUpdated", nextStage);
+        const io = getIO();
+        io.to(roomId).emit("stageUpdated", nextStage);
 
         res.json(room);
     } catch (error) {
