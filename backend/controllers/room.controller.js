@@ -1,8 +1,6 @@
 const Room = require("../models/room.model");
+const { generateReflectionSummary } = require("../services/reflectionService");
 
-// ===============================
-// CREATE ROOM
-// ===============================
 exports.createRoom = async (req, res) => {
     try {
         const { name, problemStatement, maxParticipants } = req.body;
@@ -32,9 +30,6 @@ exports.createRoom = async (req, res) => {
     }
 };
 
-// ===============================
-// JOIN ROOM
-// ===============================
 exports.joinRoom = async (req, res) => {
     try {
         const { roomId } = req.params;
@@ -69,9 +64,6 @@ exports.joinRoom = async (req, res) => {
     }
 };
 
-// ===============================
-// GET ROOM DETAILS
-// ===============================
 exports.getRoom = async (req, res) => {
     try {
         const { roomId } = req.params;
@@ -100,9 +92,6 @@ exports.getRoom = async (req, res) => {
     }
 };
 
-// ===============================
-// LIST ROOMS
-// ===============================
 exports.listRooms = async (req, res) => {
     try {
         const rooms = await Room.find({ status: "active" })
@@ -116,9 +105,6 @@ exports.listRooms = async (req, res) => {
     }
 };
 
-// ===============================
-// CHANGE STAGE (Only Creator)
-// ===============================
 exports.changeStage = async (req, res) => {
     try {
         const { roomId } = req.params;
@@ -146,13 +132,11 @@ exports.changeStage = async (req, res) => {
             return res.status(400).json({ message: "Invalid stage" });
         }
 
-        // Close previous stage
         const lastStage = room.stageHistory[room.stageHistory.length - 1];
         if (lastStage && !lastStage.endedAt) {
             lastStage.endedAt = new Date();
         }
 
-        // Add new stage
         room.currentStage = nextStage;
         room.stageStartedAt = new Date();
         room.stageHistory.push({
@@ -162,6 +146,12 @@ exports.changeStage = async (req, res) => {
 
         await room.save();
 
+        if (nextStage === "reflection") {
+            generateReflectionSummary(room._id, req.io);
+        }
+
+        req.io.to(roomId).emit("stageUpdated", nextStage);
+
         res.json(room);
     } catch (error) {
         console.error(error);
@@ -169,9 +159,6 @@ exports.changeStage = async (req, res) => {
     }
 };
 
-// ===============================
-// UPDATE ROOM STATUS
-// ===============================
 exports.updateStatus = async (req, res) => {
     try {
         const { roomId } = req.params;

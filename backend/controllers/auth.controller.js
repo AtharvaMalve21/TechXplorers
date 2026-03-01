@@ -2,14 +2,12 @@ const User = require("../models/user.model");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// Generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: "7d",
   });
 };
 
-// @route POST /api/auth/register
 exports.registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -32,9 +30,9 @@ exports.registerUser = async (req, res) => {
 
     res.cookie("jwt", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV !== "development", // Use secure cookies in production
-      sameSite: "strict", // Prevent CSRF attacks
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      secure: process.env.NODE_ENV !== "development",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.status(201).json({
@@ -48,7 +46,6 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-// @route POST /api/auth/login
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -83,7 +80,6 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-// @route POST /api/auth/logout
 exports.logoutUser = (req, res) => {
   res.cookie("jwt", "", {
     httpOnly: true,

@@ -1,9 +1,9 @@
 const Message = require("../models/message.model");
 const Room = require("../models/room.model");
+const { scoreMessage } = require("../services/reasoningScoringService");
+const { updateRoomAnalytics } = require("../services/analyticsService");
+const { runAIModeration } = require("../services/aiModerationService");
 
-// ===============================
-// SEND MESSAGE
-// ===============================
 exports.sendMessage = async (req, res) => {
     try {
         const { roomId } = req.params;
@@ -24,7 +24,6 @@ exports.sendMessage = async (req, res) => {
             return res.status(400).json({ message: "Room is not active" });
         }
 
-        // Check if user is participant
         const isParticipant = room.participants.some(
             (id) => id.toString() === req.user._id.toString()
         );
@@ -33,7 +32,6 @@ exports.sendMessage = async (req, res) => {
             return res.status(403).json({ message: "Not a participant" });
         }
 
-        // Simple spam prevention
         if (content.length < 2) {
             return res.status(400).json({ message: "Message too short" });
         }
@@ -45,16 +43,30 @@ exports.sendMessage = async (req, res) => {
             stage: room.currentStage,
         });
 
-        res.status(201).json(message);
+        
+        scoreMessage(message._id, req.io);
+        updateRoomAnalytics(roomId);
+
+        
+        const populatedMessage = await message.populate("sender", "name email");
+        req.io.to(roomId).emit("newMessage", populatedMessage);
+
+        const messageCount = await Message.countDocuments({
+            room: roomId,
+            messageType: "user",
+        });
+
+        if (messageCount % 3 === 0) {
+            runAIModeration(roomId, req.io);
+        }
+
+        res.status(201).json(populatedMessage);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error" });
     }
 };
 
-// ===============================
-// GET ROOM MESSAGES
-// ===============================
 exports.getRoomMessages = async (req, res) => {
     try {
         const { roomId } = req.params;

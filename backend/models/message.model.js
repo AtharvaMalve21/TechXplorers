@@ -47,6 +47,11 @@ const messageSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    
+    logicalDepth: {
+      type: Number,
+      default: 0,
+    },
 
     flaggedSpam: {
       type: Boolean,
